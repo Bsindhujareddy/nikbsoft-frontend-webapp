@@ -1,0 +1,88 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION = "us-east-1"
+
+        S3_BUCKET = "nikbsoft-codedeploy-artifacts"
+
+        APPLICATION_NAME = "nikbsoft-frontend-codedeploy-application"
+
+        DEPLOYMENT_GROUP = "nikbsoft-frontend-codedeploy-dmgroup"
+    }
+
+    stages {
+
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main',
+                credentialsId: 'github-cred',
+                url: 'https://github.com/Bsindhujareddy/nikbsoft-frontend-webapp.git'
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                dir('frontend') {
+                    sh 'npm install'
+                }
+            }
+        }
+
+        stage('Build React App') {
+            steps {
+                dir('frontend') {
+                    sh 'npm run build'
+                }
+            }
+        }
+
+        stage('Package Application') {
+            steps {
+                dir('frontend') {
+                    sh '''
+                    zip -r frontend.zip . \
+                    -x "node_modules/*" \
+                    -x ".git/*"
+                    '''
+                }
+            }
+        }
+
+        stage('Upload Artifact') {
+            steps {
+
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-cred'
+                ]]) {
+
+                    sh '''
+                    aws s3 cp frontend/frontend.zip \
+                    s3://$S3_BUCKET/frontend.zip \
+                    --region $AWS_REGION
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy Application') {
+            steps {
+
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-cred'
+                ]]) {
+
+                    sh '''
+                    aws deploy create-deployment \
+                      --application-name $APPLICATION_NAME \
+                      --deployment-group-name $DEPLOYMENT_GROUP \
+                      --s3-location bucket=$S3_BUCKET,bundleType=zip,key=frontend.zip \
+                      --region $AWS_REGION
+                    '''
+                }
+            }
+        }
+    }
+}

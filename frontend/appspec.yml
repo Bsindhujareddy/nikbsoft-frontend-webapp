@@ -3,20 +3,25 @@ os: linux
 
 files:
   - source: /
-    destination: /home/ubuntu/frontend
+    destination: /home/ubuntu/frontend-app
 
 hooks:
+
   BeforeInstall:
-    - location: scripts/stop.sh
+    - location: scripts/stop_nginx.sh
       timeout: 300
       runas: ubuntu
 
   AfterInstall:
-    - location: scripts/install.sh
+    - location: scripts/install_dependencies.sh
+      timeout: 300
+      runas: ubuntu
+
+    - location: scripts/build_app.sh
       timeout: 300
       runas: ubuntu
 
   ApplicationStart:
-    - location: scripts/start.sh
+    - location: scripts/deploy_nginx.sh
       timeout: 300
       runas: ubuntu
